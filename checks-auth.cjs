@@ -1,0 +1,35 @@
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
+const store=new Map(),nodes=new Map(),events={};let failWrite=false,failRemove=false,cleared=0;
+function node(id){if(!nodes.has(id))nodes.set(id,{innerHTML:'',style:{},value:'',classList:{toggle(){},remove(){}},addEventListener(){},focus(){},setSelectionRange(){},scrollTop:0,scrollHeight:0});return nodes.get(id)}
+const sandbox={structuredClone,console,Date,Set,Map,JSON,String,Number,Array,Object,Math,RegExp,Error,FormData,URL,localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>{if(failWrite)throw Error('quota');store.set(k,v)},removeItem:k=>{if(failRemove)throw Error('denied');store.delete(k)}},document:{title:'',body:{style:{}},getElementById:node,querySelector:()=>null,addEventListener(){}},window:{scrollTo(){},addEventListener:(t,f)=>events[t]=f},navigator:{},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){cleared++}};
+vm.createContext(sandbox);for(const f of ['app','experience','job-pool'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),sandbox);
+vm.runInContext(`state.profile.name='原有同学';job(6).note='此前保留的真实备注';save()`,sandbox);
+vm.runInContext(fs.readFileSync('dist/auth.js','utf8'),sandbox);
+let n=0;function check(name,expr){assert(vm.runInContext(expr,sandbox),name);console.log('PASS',name);n++}
+check('first visit shows login with explicit demo boundary and no password input',`!activeAccount&&document.title==='登录 · InternPilot'&&loginPage().includes('尚未接入真实身份认证')&&!loginPage().includes('type="password"')`);
+check('signed out navigation cannot reveal the workspace or save changes',`(()=>{nav('pool');return document.getElementById('app').innerHTML.includes('欢迎来到')&&!save()})()`);
+check('first primary login migrates earlier browser records without deleting legacy data',`loginDemo('primary')&&state.profile.name==='原有同学'&&job(6).note==='此前保留的真实备注'&&STORAGE===accountKey('primary')&&JSON.parse(localStorage.getItem('internpilot-ui-v1')).profile.name==='原有同学'`);
+check('both account entries expose switch and logout actions',`(()=>{openAccountMenu();return accountControl().includes('openAccountMenu')&&sidebar().includes('账号管理')&&document.getElementById('overlay-root').innerHTML.includes('切换账号')&&document.getElementById('overlay-root').innerHTML.includes('退出登录')})()`);
+check('logout preserves data while clearing drafts, undo, context and running tasks',`(()=>{state.profile.name='主账号修改';job(6).note='主账号投递备注';save();chatDraft='未发问题';chatQuote={text:'旧引用',jobId:6};manualJobDraft={record:{}};lastUndo={kind:'pool'};selected.add(6);task={running:true,status:'running'};return finishAccountExit('switch')&&!activeAccount&&!task.running&&!chatDraft&&!chatQuote&&!manualJobDraft&&!lastUndo&&selected.size===0&&document.getElementById('overlay-root').innerHTML===''&&loginAccount==='secondary'})()`);
+check('second account starts with separate profile, pool and application history',`loginDemo('secondary')&&state.profile.name==='体验同学'&&activePool().length===0&&state.jobs.every(j=>j.status==='pending'&&!hasApplication(j))&&state.profile.experiences.length===0&&!state.messages.length`);
+check('changes to secondary account never alter primary records',`(()=>{state.profile.name='第二账号';updateSaved([2],true);updateStatus([2],'applied','2026-10-20','第二账号备注');return JSON.parse(localStorage.getItem(accountKey('primary'))).profile.name==='主账号修改'&&JSON.parse(localStorage.getItem(accountKey('primary'))).jobs.find(j=>j.id===6).note==='主账号投递备注'})()`);
+failWrite=true;
+check('storage write failure blocks logout and retains active account',`!finishAccountExit('logout')&&activeAccount==='secondary'&&state.profile.name==='第二账号'`);
+failWrite=false;failRemove=true;
+check('session removal failure leaves a retryable logged in session',`!finishAccountExit('logout')&&activeAccount==='secondary'&&localStorage.getItem(DEMO_SESSION)==='secondary'`);
+failRemove=false;
+check('logout can be retried and does not delete the account data',`finishAccountExit('logout')&&!localStorage.getItem(DEMO_SESSION)&&JSON.parse(localStorage.getItem(accountKey('secondary'))).jobs.find(j=>j.id===2).note==='第二账号备注'`);
+failWrite=true;
+check('failed login keeps the login page and existing stored records',`!loginDemo('primary')&&!activeAccount&&loginError.includes('重试')&&JSON.parse(localStorage.getItem(accountKey('primary'))).profile.name==='主账号修改'`);
+failWrite=false;
+check('returning to primary restores its profile and application records only',`loginDemo('primary')&&state.profile.name==='主账号修改'&&job(6).note==='主账号投递备注'&&!job(2).saved&&job(2).status==='pending'`);
+check('refresh restores the selected account and saved data',`(()=>{state=fresh();activeAccount=null;bootAccountSession();return activeAccount==='primary'&&state.profile.name==='主账号修改'&&document.title==='工作台 · InternPilot'})()`);
+store.set('internpilot-demo-session-v1','secondary');events.storage({key:'internpilot-demo-session-v1'});
+check('another tab changing session clears this tabs drafts and forces account selection',`!activeAccount&&loginNotice.includes('其他标签页')&&!save()&&document.title==='登录 · InternPilot'`);
+check('secondary records survive switching back after a session change',`loginDemo('secondary')&&state.profile.name==='第二账号'&&job(2).status==='applied'&&job(2).saved&&job(2).note==='第二账号备注'`);
+vm.runInContext(`finishAccountExit('logout')`,sandbox);
+store.set('internpilot-account-secondary-v1','{invalid');
+check('corrupt account data is reported without overwriting it',`!loginDemo('secondary')&&!activeAccount&&localStorage.getItem(accountKey('secondary'))==='{invalid'`);
+assert(cleared>0,'account transitions clear task timers');console.log(`${n} account behavior checks passed.`);
+store.set('internpilot-demo-session-v1','primary');
+const reload={...sandbox,document:{...sandbox.document},window:{scrollTo(){},addEventListener(){}}};vm.createContext(reload);for(const f of ['app','experience','job-pool','auth'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),reload);assert(vm.runInContext(`activeAccount==='primary'&&state.profile.name==='主账号修改'&&job(6).note==='主账号投递备注'&&document.title==='工作台 · InternPilot'`,reload),'all four scripts restore the correct account on full reload');console.log('PASS full application reload restores account and records');

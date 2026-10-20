@@ -1,0 +1,21 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+# Local runtime and editor files
+.DS_Store
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.vscode/
+# Local user records, browser profiles and databases
+uploads/
+user-data/
+browser-profile/
+*.db
+*.sqlite
+*.sqlite3
+# Temporary output
+*.log
