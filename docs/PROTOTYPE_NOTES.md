@@ -28,7 +28,7 @@ Experience drafts never persist to the profile until the user confirms. A draft 
 
 ## Validation
 
-`node --check dist/app.js`, `node --check dist/experience.js`, `node --check dist/job-pool.js`, and `node checks.cjs` check syntax, view rendering, separate result/pool scopes, screening, manual job addition and deduplication, preservation across reload, archive/restore, contextual quote handling, experience confirmation, application data isolation, undo, failed persistence and sample task recovery. These are VM-based logic checks, not browser interaction or visual verification. Browser visual QA is not available in the current tool environment. The contextual job workspace targets desktop web.
+`node --check dist/app.js`, `node --check dist/experience.js`, `node --check dist/job-pool.js`, and `node checks.cjs` check syntax, view rendering, separate result/pool scopes, screening, manual job addition and deduplication, preservation across reload, archive/restore, contextual quote handling, experience confirmation, application data isolation, undo, failed persistence and sample task recovery. These are VM-based logic checks, not browser interaction or visual verification. The updated profile flow was also checked in the managed browser preview. The contextual job workspace targets desktop web.
 
 ## Demo account flow
 
@@ -36,4 +36,12 @@ The entry page now explicitly offers two **demo accounts**, with no password or 
 
 This is a UI and local data workflow demonstration, not an authentication or access-control implementation. It does not verify a person's identity, secure data between browser users, synchronize across devices, or sign in to recruitment platforms. Production use requires server-backed authentication, authorization and per-user storage. Use synthetic data while reviewing the prototype.
 
-Validation: `node checks.cjs` and `node checks-auth.cjs`. Browser visual QA was unavailable in the managed environment.
+Validation: `node checks.cjs` and `node checks-auth.cjs`. The profile update includes managed-browser interaction and screenshot review.
+
+## Education and material review update
+
+`dist/profile.js` extends the existing profile with independently editable education records (school, degree, study status, major, discipline, dates, 985/211 tags and courses). Education matching distinguishes explicit requirements, preferences and unknowns; no unrequested school prestige weighting is applied. The original identity field remains a general user label; detailed matching reads confirmed education records.
+
+The resume panel keeps source text and offers a local rule-based extraction demo. A review queue separates education and experience records, permits edits, and explicitly asks whether to add a new record or update a selected existing record. Confirmation retains the exact source excerpt and material name; skipped or abandoned drafts do not enter the archive. Imported text never silently deletes earlier records. Source changes and structured changes remain separately reviewable. PDF/DOCX parsing and actual model extraction are not connected.
+
+Run `node checks.cjs`, `node checks-auth.cjs`, and `node checks-profile.cjs`. Education changes have undo/history, preserve application records, and mark dependent analyses as needing refresh. All storage remains browser-local and per demo account.

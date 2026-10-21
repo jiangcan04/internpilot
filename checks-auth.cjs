@@ -2,7 +2,7 @@ const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/st
 const store=new Map(),nodes=new Map(),events={};let failWrite=false,failRemove=false,cleared=0;
 function node(id){if(!nodes.has(id))nodes.set(id,{innerHTML:'',style:{},value:'',classList:{toggle(){},remove(){}},addEventListener(){},focus(){},setSelectionRange(){},scrollTop:0,scrollHeight:0});return nodes.get(id)}
 const sandbox={structuredClone,console,Date,Set,Map,JSON,String,Number,Array,Object,Math,RegExp,Error,FormData,URL,localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>{if(failWrite)throw Error('quota');store.set(k,v)},removeItem:k=>{if(failRemove)throw Error('denied');store.delete(k)}},document:{title:'',body:{style:{}},getElementById:node,querySelector:()=>null,addEventListener(){}},window:{scrollTo(){},addEventListener:(t,f)=>events[t]=f},navigator:{},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){cleared++}};
-vm.createContext(sandbox);for(const f of ['app','experience','job-pool'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),sandbox);
+vm.createContext(sandbox);for(const f of ['app','experience','job-pool','profile'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),sandbox);
 vm.runInContext(`state.profile.name='原有同学';job(6).note='此前保留的真实备注';save()`,sandbox);
 vm.runInContext(fs.readFileSync('dist/auth.js','utf8'),sandbox);
 let n=0;function check(name,expr){assert(vm.runInContext(expr,sandbox),name);console.log('PASS',name);n++}
@@ -32,4 +32,4 @@ store.set('internpilot-account-secondary-v1','{invalid');
 check('corrupt account data is reported without overwriting it',`!loginDemo('secondary')&&!activeAccount&&localStorage.getItem(accountKey('secondary'))==='{invalid'`);
 assert(cleared>0,'account transitions clear task timers');console.log(`${n} account behavior checks passed.`);
 store.set('internpilot-demo-session-v1','primary');
-const reload={...sandbox,document:{...sandbox.document},window:{scrollTo(){},addEventListener(){}}};vm.createContext(reload);for(const f of ['app','experience','job-pool','auth'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),reload);assert(vm.runInContext(`activeAccount==='primary'&&state.profile.name==='主账号修改'&&job(6).note==='主账号投递备注'&&document.title==='工作台 · InternPilot'`,reload),'all four scripts restore the correct account on full reload');console.log('PASS full application reload restores account and records');
+const reload={...sandbox,document:{...sandbox.document},window:{scrollTo(){},addEventListener(){}}};vm.createContext(reload);for(const f of ['app','experience','job-pool','profile','auth'])vm.runInContext(fs.readFileSync(`dist/${f}.js`,'utf8'),reload);assert(vm.runInContext(`activeAccount==='primary'&&state.profile.name==='主账号修改'&&job(6).note==='主账号投递备注'&&document.title==='工作台 · InternPilot'`,reload),'all four scripts restore the correct account on full reload');console.log('PASS full application reload restores account and records');
